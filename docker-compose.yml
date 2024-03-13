@@ -1,0 +1,25 @@
+version: '2'
+
+services:
+  crawler_project:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crawler_project_php
+    ports:
+      - "8080:80"
+      #      - "443:443"
+    volumes:
+      - .:/var/www/html/
+    links:
+      - db
+
+  db:
+    image: mysql:latest
+    container_name: crawler_project_mysql
+    #    ports:
+    #      - "3307:3306"
+    volumes:
+      - /var/libs/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=Angelica@1714
