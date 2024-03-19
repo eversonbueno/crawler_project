@@ -22,4 +22,5 @@ services:
     volumes:
       - /var/libs/mysql
     environment:
+      - MYSQL_DATABASE=api_search_crawler
       - MYSQL_ROOT_PASSWORD=Angelica@1714
