@@ -17,4 +17,4 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/search', 'CurrencyCaptureController@search');
+//Route::post('/search', [\App\Http\Controllers\CurrencyCaptureController::class, 'search'])->name('currency.search');

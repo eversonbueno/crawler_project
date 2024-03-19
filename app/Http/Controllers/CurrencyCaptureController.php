@@ -6,28 +6,50 @@ namespace App\Http\Controllers;
 
 use DOMDocument;
 use DOMXPath;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CurrencyCaptureController extends Controller
 {
-    public function search()
+    public function __invoke(string $code, string $codeList, int $number, int $numberList) {
+        // Use the parameters…
+    }
+
+    public function search(Request $request)
     {
-        // Inicia a biblioteca cURL
-        $ch = curl_init();
+        $urlRequest = 'https://pt.wikipedia.org/wiki/ISO_4217';
+        $paramsRequest = ['code', 'code_list', 'number', 'number_lists'];
+        $currencies = [];
 
-        // Define a URL para fazer a requisição
-        curl_setopt($ch, CURLOPT_URL, "https://pt.wikipedia.org/wiki/ISO_4217");
+        try {
+            if ($request->request->keys() and !in_array($request->request->keys()[0], $paramsRequest)) {
+                throw new \Exception('O parametro informado não é valido para a rota');
+            }
 
-        // Habilita a opção para retornar a resposta
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+            if ($request->request->keys() and
+                (!isset($request->request->keys()[0]) || $request->request->keys()[0] == '')) {
+                throw new \Exception('Não foi informado parametros para a pesquisa');
+            }
 
-        // Executa a requisição e armazena a resposta
-        $response = curl_exec($ch);
+            // Inicia a biblioteca cURL
+            $ch = curl_init();
 
-        // Fecha a conexão
-        curl_close($ch);
+            // Define a URL para fazer a requisição
+            curl_setopt($ch, CURLOPT_URL, $urlRequest);
 
-        // Verifica se a requisição foi bem-sucedida
-        if ($response !== FALSE) {
+            // Habilita a opção para retornar a resposta
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+
+            // Executa a requisição e armazena a resposta
+            $response = curl_exec($ch);
+
+            // Fecha a conexão
+            curl_close($ch);
+
+            if ($response == FALSE) {
+                throw new \Exception('Falha na requisição para a URL ');
+            }
+
             // Cria um DOMDocument para manipular o HTML
             $dom = new DOMDocument();
 
@@ -36,72 +58,39 @@ class CurrencyCaptureController extends Controller
 
             $xpath = new DOMXpath($dom);
 
-            $tables = $xpath->query("//table[@class=\"wikitable sortable\"]");
-            $values = $xpath->query(".//tbody/tr", $tables->item(0));
-            dump($values);
-            die('final');
-            $currencies = [];
+            foreach ($request->request->filter($request->request->keys()[0]) as $request) {
+                $tables = $xpath->query(
+                    '//table[@class="wikitable sortable"]/tbody/tr/td[normalize-space(text()) = "' .
+                    $request . '"]');
+                $currency_locations = [];
 
-            foreach ($values as $value){
-                dump(typeOf($value));
-//                dump($value->items(0));
-//                $table = $xpath->query(".//td", $value);
-//                dump($table->item(2));
-//                dump($table2->item(1));
-//                dump(trim($table2->item(2)->textContent));
-//                dump(trim($table->item(3)->textContent));
-//                dump(trim($table->item(4)->textContent));
-//                dump(trim($table->item(5)->textContent));
+                foreach ($tables as $table) {
+                    $value = $xpath->query(".//../td", $table);
+                    $locations = explode(',', $value->item(4)->textContent);
 
-                /* Acessa o conteúdo em texto do primeiro elemento TD */
-//                $code = trim($meta->item(2)->textContent);
-//                dump($code);
-//                $number = trim($meta->item(3)->textContent);
-//                dump($number);
-//                $currency = trim($meta->item(1)->textContent);
-//                dump($currency);
+                    foreach ($locations as $location) {
+                        $currency_locations[] = [
+                            'location' => trim($location),
+                            'icon' => trim($location)
+                        ];
+                    }
+
+                    $currencies[] = [
+                        'code' => trim($value->item(0)->textContent),
+                        'number' => trim($value->item(1)->textContent),
+                        'decimal' => trim($value->item(2)->textContent),
+                        'currency' => trim($value->item(3)->textContent),
+                        'currency_locations' => $currency_locations
+                    ];
+                }
             }
 
+            return json_encode(['message' => 'Crawler executado com Sucesso', 'currencies' => json_encode($currencies),
+                'error_message' => '']);
 
-                // Obtém o elemento title
-//            $title = $dom->getElementsByTagName('title')->item(0)->nodeValue;
-
-            // Obtém os meta tags
-//            $bodys = $dom->getElementsByTagName('body');
-
-            $description = "";
-            $keywords = "";
-
-//            for ($i = 0; $i < $codes->length; $i++) {
-//                $code = $codes->item($i);
-//                echo 'Passei por aqui';
-//            }
-
-            // Loop para obter a description e keywords
-//            for ($i = 0; $i < $bodys->length; $i++) {
-//                $meta = $bodys->item($i);
-//                var_dump($meta);
-//                var_dump($meta->documentElement->getAttributeNames());
-
-//                dump($meta->getElementsByTagName('body'));
-//                print_r($meta->getElementsByTagName('html'));
-
-//                print_r($meta->getAttribute('parentNode'));
-
-//                if (strtolower($meta->getAttribute('name')) == 'description') {
-//                    $description = $meta->getAttribute('content');
-//                }
-//                if (strtolower($meta->getAttribute('name')) == 'keywords') {
-//                    $keywords = $meta->getAttribute('content');
-//                }
-//            }
-
-//            // Exibe os valores obtidos
-//            echo "Title: $title<br>";
-//            echo "Description: $description<br>";
-//            echo "Keywords: $keywords<br>";
-
-            return 'Finalizado';
+        }catch (\Exception $e) {
+            return json_encode(['message' => 'Erro na execução do Crawler', 'currencies' => [],
+                'error_message' => $e->getMessage()]);
         }
     }
 }
