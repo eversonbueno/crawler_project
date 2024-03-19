@@ -22,6 +22,8 @@ class CurrencyCaptureController extends Controller
         $currencies = [];
 
         try {
+            $typeRequest = gettype($request->request->filter($request->request->keys()[0]));
+
             if ($request->request->keys() and !in_array($request->request->keys()[0], $paramsRequest)) {
                 throw new \Exception('O parametro informado não é valido para a rota');
             }
@@ -58,7 +60,14 @@ class CurrencyCaptureController extends Controller
 
             $xpath = new DOMXpath($dom);
 
-            foreach ($request->request->filter($request->request->keys()[0]) as $request) {
+            $requests = $request->request->filter($request->request->keys()[0]);
+            if ($typeRequest !== 'array') {
+                $requests = [
+                    $request->request->filter($request->request->keys()[0])
+                ];
+            }
+
+            foreach ($requests as $request) {
                 $tables = $xpath->query(
                     '//table[@class="wikitable sortable"]/tbody/tr/td[normalize-space(text()) = "' .
                     $request . '"]');
@@ -66,13 +75,21 @@ class CurrencyCaptureController extends Controller
 
                 foreach ($tables as $table) {
                     $value = $xpath->query(".//../td", $table);
-                    $locations = explode(',', $value->item(4)->textContent);
+                    $spans = $xpath->query('.//../span[@class="mw-image-border"]', $value->item(4));
 
-                    foreach ($locations as $location) {
-                        $currency_locations[] = [
-                            'location' => trim($location),
-                            'icon' => trim($location)
-                        ];
+                    foreach ($spans as $span) {
+                        $imagens = $xpath->query('.//../img', $span);
+                        foreach ($imagens as $imagem) {
+                            if (!in_array(trim($imagem->getAttribute("src")), $currency_locations)) {
+                                $currency_locations[] = ['icon' => trim($imagem->getAttribute("src"))];
+                            }
+                        }
+
+                        $locations = $xpath->query('.//../a', $span);
+                        foreach ($locations as $location) {
+                            $currency_locations[] = ['location' => trim($location->getAttribute("title"))];
+                        }
+
                     }
 
                     $currencies[] = [
@@ -90,7 +107,7 @@ class CurrencyCaptureController extends Controller
 
         }catch (\Exception $e) {
             return json_encode(['message' => 'Erro na execução do Crawler', 'currencies' => [],
-                'error_message' => $e->getMessage()]);
+                'error_message' => $e->getMessage(), 'error_tracing' => $e->getTraceAsString()]);
         }
     }
 }
